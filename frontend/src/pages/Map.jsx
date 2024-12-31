@@ -32,8 +32,8 @@ const Map = () => {
       const mapInstance = tt.map({
         key: apiKey,
         container: 'map',
-        center: location.state?.coordinates || [73.2090, 20.6139],
-        zoom: location.state?.coordinates ? 15 : 5,
+        center: [77.2090, 28.6139], // Default center (Delhi)
+        zoom: 5,
         style: 'https://api.tomtom.com/style/1/style/22.2.1-*?map=2/basic_street-light&key=' + apiKey
       });
 
@@ -47,16 +47,25 @@ const Map = () => {
           addMarker([lng, lat]);
         });
 
-        // If coordinates were passed, add marker
+        // If coordinates were passed, add marker and animate to location
         if (location.state?.coordinates) {
           const [lng, lat] = location.state.coordinates;
-          addMarker([lng, lat]);
-        }
-      });
+          console.log('Animating to coordinates:', [lng, lat]);
 
-      mapInstance.on('error', (error) => {
-        console.error('Map error:', error);
-        setError('Error loading map. Please check your internet connection and try again.');
+          // Add marker first
+          addMarker([lng, lat]);
+
+          // Then animate to the location with a slight delay
+          setTimeout(() => {
+            mapInstance.flyTo({
+              center: [lng, lat],
+              zoom: 15,
+              duration: 2000,
+              essential: true,
+              animate: true
+            });
+          }, 100);
+        }
       });
 
       return () => {
@@ -90,126 +99,6 @@ const Map = () => {
     }
   };
 
-  // Get current location
-  const getCurrentLocation = () => {
-    if (!map) {
-      console.error('Map not initialized');
-      setError('Map is not ready. Please try again.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    // First remove any existing marker
-    if (marker) {
-      marker.remove();
-    }
-
-    // Show loading popup in the center of the viewport
-    const loadingPopup = new tt.Popup({ 
-      closeButton: false,
-      className: 'custom-popup',
-      anchor: 'center'
-    })
-    .setLngLat(map.getCenter())
-    .setHTML(`
-      <div class="p-4 text-center bg-white rounded-lg">
-        <div class="animate-pulse">
-          <div class="text-lg font-semibold text-gray-700 mb-2">Getting your location...</div>
-          <div class="text-sm text-gray-500">Please allow location access</div>
-        </div>
-      </div>
-    `)
-    .addTo(map);
-
-    // Check if geolocation is supported
-    if (!navigator.geolocation) {
-      loadingPopup.remove();
-      setError('Geolocation is not supported by your browser');
-      setIsLoading(false);
-      return;
-    }
-
-    const geolocationOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    };
-
-    try {
-      navigator.geolocation.getCurrentPosition(
-        // Success callback
-        async (position) => {
-          try {
-            const { longitude, latitude } = position.coords;
-            console.log('Location found:', { longitude, latitude });
-            
-            // Remove loading popup
-            loadingPopup.remove();
-
-            // Center map on location immediately
-            map.setCenter([longitude, latitude]);
-            map.setZoom(15);
-
-            // Add marker
-            await addMarker([longitude, latitude]);
-
-            // Show success message
-            const successPopup = new tt.Popup({ 
-              closeButton: false,
-              className: 'custom-popup',
-              anchor: 'top'
-            })
-            .setLngLat([longitude, latitude])
-            .setHTML(`
-              <div class="p-3 text-center bg-white rounded-lg">
-                <div class="text-green-600 font-medium">Location found!</div>
-              </div>
-            `)
-            .addTo(map);
-
-            // Remove success popup after 2 seconds
-            setTimeout(() => successPopup.remove(), 2000);
-
-          } catch (err) {
-            console.error('Error handling location:', err);
-            loadingPopup.remove();
-            setError('Error processing location. Please try again.');
-          } finally {
-            setIsLoading(false);
-          }
-        },
-        // Error callback
-        (error) => {
-          console.error('Geolocation error:', error);
-          loadingPopup.remove();
-          setIsLoading(false);
-          
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              setError('Please enable location access in your browser settings and try again.');
-              break;
-            case error.POSITION_UNAVAILABLE:
-              setError('Location information is unavailable. Please check your device settings.');
-              break;
-            case error.TIMEOUT:
-              setError('Location request timed out. Please try again.');
-              break;
-            default:
-              setError('An error occurred while getting your location. Please try again.');
-          }
-        },
-        geolocationOptions
-      );
-    } catch (e) {
-      console.error('Unexpected error in getCurrentLocation:', e);
-      loadingPopup.remove();
-      setIsLoading(false);
-      setError('Unexpected error accessing location services. Please try again.');
-    }
-  };
-
   // Add marker to map
   const addMarker = useCallback(async (coordinates) => {
     if (!map) return;
@@ -233,16 +122,18 @@ const Map = () => {
         return;
       }
 
-      // Get address for the location
-      const address = await getAddressFromCoordinates(lng, lat);
-      
       // Create marker element
       const markerElement = document.createElement('div');
       markerElement.className = 'custom-marker';
       markerElement.innerHTML = `
-        <div class="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg relative">
-          <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-            <div class="w-2 h-2 bg-red-500 rotate-45 transform origin-top"></div>
+        <div class="relative">
+          <div class="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-lg shadow-lg text-sm whitespace-nowrap">
+            ${location.state?.name || 'Selected Location'}
+          </div>
+          <div class="w-6 h-6 bg-red-500 rounded-full border-4 border-white shadow-lg relative">
+            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div class="w-2 h-2 bg-red-500 rotate-45 transform origin-top"></div>
+            </div>
           </div>
         </div>
       `;
@@ -250,34 +141,26 @@ const Map = () => {
       // Create new marker
       const newMarker = new tt.Marker({
         element: markerElement,
-        anchor: 'bottom',
-        draggable: true
+        anchor: 'bottom'
       })
       .setLngLat([lng, lat])
       .addTo(map);
 
-      // Handle marker drag
-      newMarker.on('dragend', async () => {
-        const position = newMarker.getLngLat();
-        const newAddress = await getAddressFromCoordinates(position.lng, position.lat);
-        setSelectedLocation({
-          coordinates: [position.lng, position.lat],
-          address: newAddress
-        });
-        setShowDialog(true);
-      });
-
       setMarker(newMarker);
+
+      // Get address and show dialog
+      const address = await getAddressFromCoordinates(lng, lat);
       setSelectedLocation({
         coordinates: [lng, lat],
         address
       });
       setShowDialog(true);
+
     } catch (err) {
       console.error('Error adding marker:', err);
       setError('Error placing marker. Please try again.');
     }
-  }, [map, marker]);
+  }, [map, marker, location.state?.name]);
 
   // Handle search
   const debouncedSearch = useCallback(
@@ -323,7 +206,7 @@ const Map = () => {
     const coordinates = [longitude, latitude];
     map.flyTo({
       center: coordinates,
-      zoom: 14
+      zoom: 15
     });
     
     await addMarker(coordinates);
@@ -392,7 +275,7 @@ const Map = () => {
                 placeholder="Search for a place in India"
                 onChange={(e) => handleSearch(e.target.value)}
                 className="w-full px-4 py-2 sm:py-2.5 bg-white rounded-xl shadow-sm border border-gray-200 
-                          focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
+                          focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none
                           text-sm sm:text-base placeholder-gray-400"
               />
             </div>
@@ -417,15 +300,6 @@ const Map = () => {
           </div>
         </div>
       </div>
-
-      {/* Error message */}
-      {error && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-30">
-          <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg shadow-md">
-            <p>{error}</p>
-          </div>
-        </div>
-      )}
 
       {/* Map container */}
       <div 
@@ -481,7 +355,7 @@ const Map = () => {
                 </button>
                 <button 
                   onClick={handleSaveLocation}
-                  className="order-1 sm:order-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 
+                  className="order-1 sm:order-2 px-4 py-2 bg-red-500 hover:bg-red-600 
                            text-white rounded-lg transition-colors duration-200
                            text-sm sm:text-base font-medium"
                 >
@@ -489,6 +363,15 @@ const Map = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-30">
+          <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg shadow-md">
+            <p>{error}</p>
           </div>
         </div>
       )}

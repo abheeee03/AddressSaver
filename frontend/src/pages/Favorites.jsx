@@ -1,44 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
-import { FiStar, FiMapPin, FiSearch } from 'react-icons/fi';
+import { FiStar, FiMapPin, FiTrash2 } from 'react-icons/fi';
 
 const Favorites = () => {
-  const navigate = useNavigate();
   const [favorites, setFavorites] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('name'); // 'name', 'date'
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Load saved locations and filter favorites
     const savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '[]');
     const favoriteLocations = savedLocations.filter(location => location.isFavorite);
     setFavorites(favoriteLocations);
   }, []);
 
-  const handleLocationClick = (coordinates) => {
-    navigate('/map', { 
-      state: { 
-        coordinates: coordinates 
-      } 
+  const handleViewOnMap = (location) => {
+    navigate('/map', {
+      state: {
+        coordinates: location.coordinates,
+        name: location.name
+      }
     });
   };
 
-  const toggleFavorite = (locationId) => {
-    // Get all saved locations
+  const handleRemoveFromFavorites = (locationId) => {
     const savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '[]');
     const updatedLocations = savedLocations.map(location => {
       if (location.id === locationId) {
-        return { ...location, isFavorite: !location.isFavorite };
+        return { ...location, isFavorite: false };
       }
       return location;
     });
-    
-    // Update localStorage
     localStorage.setItem('savedLocations', JSON.stringify(updatedLocations));
     
-    // Update favorites list
-    const updatedFavorites = updatedLocations.filter(location => location.isFavorite);
+    // Update favorites state
+    const updatedFavorites = favorites.filter(fav => fav.id !== locationId);
     setFavorites(updatedFavorites);
   };
 
@@ -46,130 +41,102 @@ const Favorites = () => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     });
   };
 
-  const filteredFavorites = favorites.filter(location => 
-    location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    location.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const sortedFavorites = [...filteredFavorites].sort((a, b) => {
-    if (sortBy === 'name') {
-      return a.name.localeCompare(b.name);
-    } else if (sortBy === 'date') {
-      return new Date(b.savedAt) - new Date(a.savedAt);
-    }
-    return 0;
-  });
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen w-full bg-white">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate('/')}
-              className="shrink-0 w-10 h-10 flex items-center justify-center bg-white rounded-full shadow hover:shadow-md transition-all duration-200 active:scale-95"
-            >
-              <IoArrowBack className="text-gray-700 text-xl" />
-            </button>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <FiStar className="text-yellow-400" />
-              Favorite Locations
-            </h1>
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <button
+                onClick={() => navigate('/')}
+                className="mr-4 p-2 rounded-full hover:bg-gray-50 transition-colors"
+              >
+                <IoArrowBack className="w-6 h-6 text-gray-600" />
+              </button>
+              <h1 className="text-2xl font-[Afacad-B] text-gray-800 flex items-center">
+                <FiStar className="w-6 h-6 text-red-500 mr-2" />
+                Favorite Locations
+              </h1>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Search and Sort Controls */}
-      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6">
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex-1 relative">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <FiSearch className="text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search favorites..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200 
-                        focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            />
-          </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200 
-                      focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-          >
-            <option value="name">Sort by Name</option>
-            <option value="date">Sort by Date</option>
-          </select>
-        </div>
-
-        {/* Favorites List */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedFavorites.map((location) => (
-            <div 
-              key={location.id}
-              className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 relative flex flex-col"
-            >
-              <button 
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 hover:bg-gray-100 transition-colors duration-200"
-                onClick={() => toggleFavorite(location.id)}
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {favorites.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {favorites.map((location) => (
+              <div
+                key={location.id}
+                className="group bg-white rounded-xl border border-gray-100 hover:border-red-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
               >
-                <FiStar className="w-5 h-5 text-yellow-400" />
-              </button>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 pr-10">
-                {location.name}
-              </h3>
-              <p className="text-gray-600 mb-3 flex-grow">
-                {location.address}
-              </p>
-              <div className="space-y-3">
-                <p className="text-sm text-gray-500">
-                  Saved: {formatDate(location.savedAt)}
-                </p>
-                <button 
-                  onClick={() => handleLocationClick(location.coordinates)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg 
-                            hover:bg-blue-600 transition-all duration-200 transform hover:translate-y-[-1px] 
-                            focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
-                >
-                  <FiMapPin />
-                  View on Map
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                {/* Card Header with Star Icon */}
+                <div className="border-b border-gray-100 group-hover:border-red-100 transition-colors p-4 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <FiStar className="w-5 h-5 text-red-500 mr-2" />
+                    <span className="font-medium text-gray-900">Favorite</span>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveFromFavorites(location.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
+                    title="Remove from favorites"
+                  >
+                    <FiTrash2 className="w-4 h-4" />
+                  </button>
+                </div>
 
-        {/* Empty State */}
-        {sortedFavorites.length === 0 && (
-          <div className="text-center py-12">
-            <FiStar className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-            {searchQuery ? (
-              <p className="text-gray-500">No favorites match your search</p>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-gray-500">No favorite locations yet</p>
-                <button 
-                  onClick={() => navigate('/')}
-                  className="text-blue-500 hover:text-blue-600 font-medium"
-                >
-                  Go back and add some favorites
-                </button>
+                {/* Card Content */}
+                <div className="p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2 line-clamp-1">
+                    {location.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Added on {formatDate(location.savedAt)}
+                  </p>
+                  <p className="text-gray-600 mb-6 line-clamp-2 h-12">
+                    {location.address}
+                  </p>
+
+                  {/* View on Map Button */}
+                  <button
+                    onClick={() => handleViewOnMap(location)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-lg
+                      hover:bg-red-600 transition-all duration-200 transform hover:-translate-y-0.5
+                      focus:ring-2 focus:ring-red-300 focus:ring-offset-2 focus:outline-none"
+                  >
+                    <FiMapPin className="w-4 h-4" />
+                    <span>View on Map</span>
+                  </button>
+                </div>
               </div>
-            )}
+            ))}
+          </div>
+        ) : (
+          <div className="max-w-md mx-auto text-center py-16 px-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+              <div className="w-16 h-16 border border-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <FiStar className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-medium text-gray-900 mb-2">No Favorite Locations</h3>
+              <p className="text-gray-500 mb-8">You haven't added any locations to your favorites yet.</p>
+              <Link
+                to="/"
+                className="inline-flex items-center px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 
+                  transition-all duration-200 transform hover:-translate-y-0.5"
+              >
+                <FiMapPin className="w-5 h-5 mr-2" />
+                Add Locations
+              </Link>
+            </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };

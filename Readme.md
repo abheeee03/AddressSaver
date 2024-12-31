@@ -19,12 +19,13 @@
 <li>
 SetUp Backend
 <ol>
-<li>SetUp .env: <ol>
+<li>SetUp .env:
+<ul>
 <li>MAP_API<li>
 <li>MONGODB_URI<li>
 <li>JWT_SECRET<li>
 <li>PORT<li>
-</ol>
+</ul>
 </li>
 <li>To Start Server : npm run dev</li>
 </ul>

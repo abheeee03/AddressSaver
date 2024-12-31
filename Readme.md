@@ -20,7 +20,10 @@
 SetUp Backend
 <ol>
 <li>SetUp .env: 
-<br>1.
+<br>1.MAP_API : Add Map API
+<br>2.MONGODB_URI : Add MongoDB URL
+<br>3.JWT_SECRET : Add A secret key for JWT
+<br>4.PORT : Add a PORT Number
 </li>
 <li>To Start Server : npm run dev</li>
 </ul>

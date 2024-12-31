@@ -1,35 +1,39 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import './Login.css';
+import './Login.css'; // We can reuse the login styles
 
-// Change the component declaration to use default export
-const Login = () => {
+const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
     try {
-      console.log('Attempting login with:', { email });
-      const response = await axios.post('http://localhost:5001/api/auth/login', {
+      const response = await axios.post('http://localhost:5001/api/auth/register', {
         email,
         password
       });
 
-      console.log('Login response:', response.data);
+      console.log('Registration successful:', response.data);
       const { token } = response.data;
       localStorage.setItem('token', token);
-      localStorage.setItem('userEmail', email);
       navigate('/');
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('Registration error:', err);
       setError(
         err.response?.data?.error || 
         err.message || 
-        'Server connection failed. Please try again.'
+        'Registration failed. Please try again.'
       );
     }
   };
@@ -37,7 +41,7 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h2>Login</h2>
+        <h2>Register</h2>
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -56,11 +60,22 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength="6"
             />
           </div>
-          <button type="submit">Login</button>
+          <div className="form-group">
+            <label>Confirm Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength="6"
+            />
+          </div>
+          <button type="submit">Register</button>
           <p className="auth-link">
-            Don't have an account? <Link to="/register">Register here</Link>
+            Already have an account? <Link to="/login">Login here</Link>
           </p>
         </form>
       </div>
@@ -68,5 +83,4 @@ const Login = () => {
   );
 };
 
-// Make sure to add this line at the end
-export default Login;
+export default Register; 

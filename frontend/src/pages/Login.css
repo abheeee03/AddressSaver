@@ -62,4 +62,19 @@ button:hover {
   padding: 0.5rem;
   background-color: #f8d7da;
   border-radius: 4px;
+}
+
+.auth-link {
+  text-align: center;
+  margin-top: 1rem;
+  color: #666;
+}
+
+.auth-link a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.auth-link a:hover {
+  text-decoration: underline;
 } 

@@ -1,6 +1,5 @@
 <h1>Address Saver</h1><br>
 <p>Features are stated Below: <p><br>
-<hr>
 <ul>
 <li>Save Current Location</li>
 <li>Find Location and Save it from World Wide</li>

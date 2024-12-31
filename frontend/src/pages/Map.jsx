@@ -4,7 +4,6 @@ import { IoArrowBack } from 'react-icons/io5';
 import tt from '@tomtom-international/web-sdk-maps';
 import * as ttapi from '@tomtom-international/web-sdk-services';
 import '@tomtom-international/web-sdk-maps/dist/maps.css';
-import { logout } from '../utils/auth';
 
 const Map = () => {
   const navigate = useNavigate();
@@ -18,106 +17,59 @@ const Map = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Function to get current location
-  const getCurrentLocation = () => {
-    setIsLoading(true);
-    setError(null);
-
-    // First check if geolocation is supported
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
-      setIsLoading(false);
+  // Initialize map
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_MAP_API;
+    
+    if (!apiKey) {
+      console.error('TomTom API key is missing');
+      setError('Map configuration error. Please try again later.');
       return;
     }
 
-    // Check if permission is already granted
-    navigator.permissions.query({ name: 'geolocation' }).then((permissionStatus) => {
-      console.log('Geolocation permission status:', permissionStatus.state);
-      
-      if (permissionStatus.state === 'denied') {
-        setError('Location access is blocked. Please enable location access in your browser settings.');
-        setIsLoading(false);
-        return;
-      }
+    try {
+      console.log('Initializing map...');
+      const mapInstance = tt.map({
+        key: apiKey,
+        container: 'map',
+        center: location.state?.coordinates || [73.2090, 20.6139],
+        zoom: location.state?.coordinates ? 15 : 5,
+        style: 'https://api.tomtom.com/style/1/style/22.2.1-*?map=2/basic_street-light&key=' + apiKey
+      });
 
-      // Geolocation options
-      const options = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      };
+      mapInstance.on('load', () => {
+        console.log('Map loaded successfully');
+        setMap(mapInstance);
 
-      // Success callback
-      const success = async (position) => {
-        try {
-          console.log('Got position:', position);
-          const { longitude, latitude } = position.coords;
-          
-          if (map) {
-            console.log('Flying to coordinates:', [longitude, latitude]);
-            map.flyTo({
-              center: [longitude, latitude],
-              zoom: 14
-            });
-            
-            await addMarker([longitude, latitude]);
-          } else {
-            console.error('Map not initialized');
-            setError('Map not initialized. Please try again.');
-          }
-        } catch (err) {
-          console.error('Error in success callback:', err);
-          setError('Error processing location data. Please try again.');
-        } finally {
-          setIsLoading(false);
+        // Add click handler for manual location selection
+        mapInstance.on('click', (event) => {
+          const { lng, lat } = event.lngLat;
+          addMarker([lng, lat]);
+        });
+
+        // If coordinates were passed, add marker
+        if (location.state?.coordinates) {
+          const [lng, lat] = location.state.coordinates;
+          addMarker([lng, lat]);
         }
+      });
+
+      mapInstance.on('error', (error) => {
+        console.error('Map error:', error);
+        setError('Error loading map. Please check your internet connection and try again.');
+      });
+
+      return () => {
+        if (marker) marker.remove();
+        mapInstance.remove();
       };
+    } catch (err) {
+      console.error('Error initializing map:', err);
+      setError('Failed to initialize map. Please refresh the page.');
+    }
+  }, []);
 
-      // Error callback
-      const error = (err) => {
-        console.error('Geolocation error:', err);
-        setIsLoading(false);
-        
-        switch (err.code) {
-          case 1: // PERMISSION_DENIED
-            setError('Location permission denied. Please allow location access and try again.');
-            break;
-          case 2: // POSITION_UNAVAILABLE
-            setError('Unable to determine your location. Please try again or check your device settings.');
-            break;
-          case 3: // TIMEOUT
-            setError('Location request timed out. Please check your internet connection and try again.');
-            break;
-          default:
-            setError('An unknown error occurred while trying to get your location.');
-        }
-      };
-
-      // Get current position with error handling
-      try {
-        const watchId = navigator.geolocation.watchPosition(success, error, options);
-        
-        // Cleanup the watch after 10 seconds or on success
-        setTimeout(() => {
-          navigator.geolocation.clearWatch(watchId);
-          if (isLoading) {
-            setIsLoading(false);
-            setError('Location request timed out. Please try again.');
-          }
-        }, 10000);
-      } catch (e) {
-        console.error('Error requesting location:', e);
-        setIsLoading(false);
-        setError('Error requesting location. Please try again.');
-      }
-    }).catch(err => {
-      console.error('Permission query error:', err);
-      setIsLoading(false);
-      setError('Error checking location permissions. Please ensure location access is enabled.');
-    });
-  };
-
-  // Function to get address from coordinates
+  // Get address from coordinates
   const getAddressFromCoordinates = async (lng, lat) => {
     try {
       const apiKey = import.meta.env.VITE_MAP_API;
@@ -138,79 +90,196 @@ const Map = () => {
     }
   };
 
-  const addMarker = useCallback(async (coordinates) => {
-    if (!map) return;
-    
+  // Get current location
+  const getCurrentLocation = () => {
+    if (!map) {
+      console.error('Map not initialized');
+      setError('Map is not ready. Please try again.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    // First remove any existing marker
     if (marker) {
       marker.remove();
     }
 
-    // Get address for the location
-    const address = await getAddressFromCoordinates(coordinates[0], coordinates[1]);
-    
-    // Create marker
-    const newMarker = new tt.Marker()
-      .setLngLat(coordinates)
+    // Show loading popup in the center of the viewport
+    const loadingPopup = new tt.Popup({ 
+      closeButton: false,
+      className: 'custom-popup',
+      anchor: 'center'
+    })
+    .setLngLat(map.getCenter())
+    .setHTML(`
+      <div class="p-4 text-center bg-white rounded-lg">
+        <div class="animate-pulse">
+          <div class="text-lg font-semibold text-gray-700 mb-2">Getting your location...</div>
+          <div class="text-sm text-gray-500">Please allow location access</div>
+        </div>
+      </div>
+    `)
+    .addTo(map);
+
+    // Check if geolocation is supported
+    if (!navigator.geolocation) {
+      loadingPopup.remove();
+      setError('Geolocation is not supported by your browser');
+      setIsLoading(false);
+      return;
+    }
+
+    const geolocationOptions = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    };
+
+    try {
+      navigator.geolocation.getCurrentPosition(
+        // Success callback
+        async (position) => {
+          try {
+            const { longitude, latitude } = position.coords;
+            console.log('Location found:', { longitude, latitude });
+            
+            // Remove loading popup
+            loadingPopup.remove();
+
+            // Center map on location immediately
+            map.setCenter([longitude, latitude]);
+            map.setZoom(15);
+
+            // Add marker
+            await addMarker([longitude, latitude]);
+
+            // Show success message
+            const successPopup = new tt.Popup({ 
+              closeButton: false,
+              className: 'custom-popup',
+              anchor: 'top'
+            })
+            .setLngLat([longitude, latitude])
+            .setHTML(`
+              <div class="p-3 text-center bg-white rounded-lg">
+                <div class="text-green-600 font-medium">Location found!</div>
+              </div>
+            `)
+            .addTo(map);
+
+            // Remove success popup after 2 seconds
+            setTimeout(() => successPopup.remove(), 2000);
+
+          } catch (err) {
+            console.error('Error handling location:', err);
+            loadingPopup.remove();
+            setError('Error processing location. Please try again.');
+          } finally {
+            setIsLoading(false);
+          }
+        },
+        // Error callback
+        (error) => {
+          console.error('Geolocation error:', error);
+          loadingPopup.remove();
+          setIsLoading(false);
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              setError('Please enable location access in your browser settings and try again.');
+              break;
+            case error.POSITION_UNAVAILABLE:
+              setError('Location information is unavailable. Please check your device settings.');
+              break;
+            case error.TIMEOUT:
+              setError('Location request timed out. Please try again.');
+              break;
+            default:
+              setError('An error occurred while getting your location. Please try again.');
+          }
+        },
+        geolocationOptions
+      );
+    } catch (e) {
+      console.error('Unexpected error in getCurrentLocation:', e);
+      loadingPopup.remove();
+      setIsLoading(false);
+      setError('Unexpected error accessing location services. Please try again.');
+    }
+  };
+
+  // Add marker to map
+  const addMarker = useCallback(async (coordinates) => {
+    if (!map) return;
+    if (!coordinates || !coordinates[0] || !coordinates[1]) {
+      console.error('Invalid coordinates:', coordinates);
+      return;
+    }
+
+    try {
+      // Remove existing marker
+      if (marker) {
+        marker.remove();
+      }
+
+      // Ensure coordinates are numbers
+      const lng = parseFloat(coordinates[0]);
+      const lat = parseFloat(coordinates[1]);
+
+      if (isNaN(lng) || isNaN(lat)) {
+        console.error('Invalid coordinate values:', { lng, lat });
+        return;
+      }
+
+      // Get address for the location
+      const address = await getAddressFromCoordinates(lng, lat);
+      
+      // Create marker element
+      const markerElement = document.createElement('div');
+      markerElement.className = 'custom-marker';
+      markerElement.innerHTML = `
+        <div class="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg relative">
+          <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+            <div class="w-2 h-2 bg-red-500 rotate-45 transform origin-top"></div>
+          </div>
+        </div>
+      `;
+
+      // Create new marker
+      const newMarker = new tt.Marker({
+        element: markerElement,
+        anchor: 'bottom',
+        draggable: true
+      })
+      .setLngLat([lng, lat])
       .addTo(map);
 
-    // Add drag functionality
-    newMarker.setDraggable(true);
+      // Handle marker drag
+      newMarker.on('dragend', async () => {
+        const position = newMarker.getLngLat();
+        const newAddress = await getAddressFromCoordinates(position.lng, position.lat);
+        setSelectedLocation({
+          coordinates: [position.lng, position.lat],
+          address: newAddress
+        });
+        setShowDialog(true);
+      });
 
-    newMarker.on('dragend', async () => {
-      const position = newMarker.getLngLat();
-      const newAddress = await getAddressFromCoordinates(position.lng, position.lat);
+      setMarker(newMarker);
       setSelectedLocation({
-        coordinates: [position.lng, position.lat],
-        address: newAddress
+        coordinates: [lng, lat],
+        address
       });
       setShowDialog(true);
-    });
-
-    setMarker(newMarker);
-    setSelectedLocation({
-      coordinates,
-      address
-    });
-    setShowDialog(true);
+    } catch (err) {
+      console.error('Error adding marker:', err);
+      setError('Error placing marker. Please try again.');
+    }
   }, [map, marker]);
 
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_MAP_API;
-    const mapInstance = tt.map({
-      key: apiKey,
-      container: 'map',
-      center: location.state?.coordinates || [73.2090, 20.6139],
-      zoom: location.state?.coordinates ? 14 : 10,
-      style: 'https://api.tomtom.com/style/1/style/22.2.1-*?map=2/basic_street-light&key=' + apiKey
-    });
-
-    setMap(mapInstance);
-
-    // Wait for map to load before adding marker and click handler
-    mapInstance.on('load', () => {
-      // Check if we should get current location
-      if (location.state?.useCurrentLocation) {
-        getCurrentLocation();
-      }
-      // Add marker if coordinates were passed
-      else if (location.state?.coordinates) {
-        const [lng, lat] = location.state.coordinates;
-        addMarker([lng, lat]);
-      }
-
-      // Add click handler for manual location selection
-      mapInstance.on('click', (event) => {
-        const { lng, lat } = event.lngLat;
-        addMarker([lng, lat]);
-      });
-    });
-
-    return () => {
-      if (marker) marker.remove();
-      mapInstance.remove();
-    };
-  }, [location.state?.coordinates, location.state?.useCurrentLocation]);
-
+  // Handle search
   const debouncedSearch = useCallback(
     debounce((query) => {
       if (query.length < 2) {
@@ -226,7 +295,6 @@ const Map = () => {
         limit: 5
       })
       .then(response => {
-        console.log('Search results:', response.results);
         setSearchResults(response.results);
       })
       .catch(error => {
@@ -247,43 +315,28 @@ const Map = () => {
     const longitude = position.lon || position.lng;
     const latitude = position.lat;
     
-    if (!longitude || !latitude || typeof longitude !== 'number' || typeof latitude !== 'number') {
+    if (!longitude || !latitude) {
       console.error('Invalid coordinates:', position);
       return;
     }
 
-    try {
-      const coordinates = [longitude, latitude];
-      map.flyTo({
-        center: coordinates,
-        zoom: 14
-      });
-      
-      await addMarker(coordinates);
-      
-      setSearchResults([]);
-      setSearchQuery('');
-      setSelectedLocation({
-        coordinates,
-        address: result.address
-      });
-      setShowDialog(true);
-    } catch (error) {
-      console.error('Error flying to location:', error);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/welcome');
+    const coordinates = [longitude, latitude];
+    map.flyTo({
+      center: coordinates,
+      zoom: 14
+    });
+    
+    await addMarker(coordinates);
+    setSearchResults([]);
+    setSearchQuery('');
   };
 
   const handleSaveLocation = () => {
     if (selectedLocation) {
-      // Get existing saved locations from localStorage
+      // Get existing saved locations
       const savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '[]');
       
-      // Create new location object
+      // Create new location
       const newLocation = {
         id: Date.now(),
         name: selectedLocation.address?.freeformAddress || 'Unnamed Location',
@@ -293,7 +346,7 @@ const Map = () => {
         savedAt: new Date().toISOString()
       };
 
-      // Add to saved locations
+      // Save location
       savedLocations.push(newLocation);
       localStorage.setItem('savedLocations', JSON.stringify(savedLocations));
 
@@ -313,14 +366,14 @@ const Map = () => {
 
       localStorage.setItem('recentLocations', JSON.stringify(recentLocations));
       setShowDialog(false);
-      navigate('/'); // Return to home after saving
+      navigate('/');
     }
   };
 
   return (
-    <div className="relative h-screen w-full bg-gray-50">
+    <div className="relative min-h-screen w-full">
       {/* Header with search */}
-      <div className="absolute top-0 left-0 right-0 z-20 px-2 py-3 sm:px-4 sm:py-4 bg-white/90 backdrop-blur-sm shadow-sm">
+      <div className="fixed top-0 left-0 right-0 z-20 px-2 py-3 sm:px-4 sm:py-4 bg-white/90 backdrop-blur-sm shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-4">
           {/* Back button */}
           <button 
@@ -344,7 +397,7 @@ const Map = () => {
               />
             </div>
 
-            {/* Search results dropdown */}
+            {/* Search results */}
             {searchResults.length > 0 && (
               <div className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-30">
                 <ul className="max-h-[40vh] sm:max-h-[50vh] overflow-y-auto">
@@ -365,18 +418,9 @@ const Map = () => {
         </div>
       </div>
 
-      {/* Loading indicator */}
-      {isLoading && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-30">
-          <div className="bg-white px-4 py-2 rounded-lg shadow-md">
-            <p className="text-gray-600">Getting your location...</p>
-          </div>
-        </div>
-      )}
-
       {/* Error message */}
       {error && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-30">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-30">
           <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg shadow-md">
             <p>{error}</p>
           </div>
@@ -384,7 +428,11 @@ const Map = () => {
       )}
 
       {/* Map container */}
-      <div id="map" className="h-screen w-full"></div>
+      <div 
+        id="map" 
+        className="fixed inset-0 z-0"
+        style={{ top: '60px' }}
+      ></div>
 
       {/* Location details modal */}
       {showDialog && selectedLocation && (

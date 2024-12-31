@@ -1,0 +1,61 @@
+:root {
+    --stars: 5vw 15vh 2px white, 1vw 33vh 0px white, 2vw 25vh 2px white, 10vw 10vh 2px white, 12vw 20vh 0px white, 30vw 15vh 2px white, 16vw 5vh 2px white, 24vw 10vh 0px white, 32vw 40vh 0px white, 33vw 35vh 2px white, 12vw 38vh 2px white, 24vw 10vh 0px white, 33vw 5vh 2px white, 20vw 10vh 0px white, 80vw 10vh 2px white, 62vw 20vh 0px white, 60vw 15vh 2px white, 70vw 7vh 0px white, 62vw 50vh 0px white, 65vw 35vh 2px white, 64vw 10vh 0px white, 85vw 2vh 0px white, 92vw 40vh 0px white, 75vw 35vh 2px white, 90vw 10vh 0px white, 80vw 33vh 2px white, 80vw 10vh 0px white, 95vw 2vh 2px white, 95vw 25vh 0px white, 65vw 25vh 0px white, 85vw 20vh 0px white, 75vw 17vh 0px white, 25vw 25vh 0px white,95vw 95vh 2px white, 1vw 90vh 0px white, 2vw 80vh 2px white, 10vw 70vh 2px white, 12vw 65vh 0px white, 30vw 80vh 2px white, 16vw 85vh 2px white, 14vw 50vh 0px white, 5vw 55vh 0px white, 20vw 58vh 2px white, 80vw 38vh 2px white, 90vw 90vh 0px white, 90vw 95vh 2px white, 88vw 10vh 0px white, 80vw 10vh 2px white, 62vw 20vh 0px white, 60vw 15vh 2px white, 70vw 7vh 0px white, 62vw 50vh 0px white, 65vw 35vh 2px white, 64vw 10vh 0px white, 85vw 55vh 0px white, 92vw 60vh 0px white, 75vw 67vh 2px white, 60vw 80vh 0px white, 56vw 95vh 2px white, 75vw 70vh 0px white, 70vw 96vh 2px white, 79vw 87vh 0px white, 80vw 78vh 0px white, 85vw 70vh 0px white, 90vw 80vh 0px white, 25vw 25vh 0px white;
+  }
+  
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  body:before {
+    content: ' ';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 50%;
+    border-radius: 100%;
+    width: 3px;
+    height: 4px;
+    z-index: -1;
+    opacity: 0.3;
+    box-shadow: var(--stars);
+  }
+  
+  .earth {
+    perspective: 400vmin;
+    transform-style: preserve-3d;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  
+  .earth::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: url(https://pbs.twimg.com/media/DON8Y_eUMAAV4pi.jpg) repeat-x;
+    background-size: cover;
+    border-radius: 50%;
+    animation: rotate 30s infinite linear;
+    box-shadow: 
+      -80px -15px 80px 10px rgba(0,0,0,.9) inset,
+      -10px 0px 15px -7px #f0df1759,
+      0 0 50px rgba(74, 144, 226, 0.3);
+    transform: scale(0.95);
+  }
+  
+  
+  @keyframes rotate {
+    0% {
+      background-position: 0px 0px;
+    }
+    100% {
+      background-position: 1200px 0px;
+    }
+  }
